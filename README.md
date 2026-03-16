@@ -1,18 +1,14 @@
 # IoTX Lib
 
-Low-code Arduino library for ESP32 — connect to Firebase and the IoTX Dashboard with minimal code.
+Low-code Arduino library for ESP32 — connect to Firebase and the [IoTX Dashboard](https://github.com/baiyuechuz/IoTX_Website) with minimal code.
 
 ## Installation
 
-Add to your `platformio.ini`:
-
 ```ini
+# platformio.ini
 lib_deps =
-    https://github.com/baiyuechuz/IoTX_Lib.git
-    adafruit/DHT sensor library  ; if using DHT sensor
+    baiyuechu/IoTX
 ```
-
-Or copy the `src/` folder into your project's `lib/IoTX/` directory.
 
 ## Quick Start
 
@@ -27,7 +23,6 @@ IoTXSensor humidity("/sensors/humidity");
 void setup() {
     Serial.begin(115200);
     dht.begin();
-
     IoTX.begin({
         .wifiSSID     = "MyWiFi",
         .wifiPassword = "password",
@@ -45,114 +40,38 @@ void loop() {
 }
 ```
 
-## API Reference
+## Classes
 
-### `IoTX.begin(config)`
+| Class | Use for | Example |
+|---|---|---|
+| `IoTXSensor` | Numeric values (temperature, humidity, smoke…) | `sensor.write(25.5)` |
+| `IoTXSwitch` | Boolean on/off with GPIO binding | `sw.attachPin(2); sw.sync()` |
+| `IoTXSlider` | Range values with PWM output | `slider.attachPin(25); slider.sync()` |
+| `IoTXDisplay` | Text with printf support | `lcd.printf("T:%.1fC", t)` |
+| `IoTXHardwareMonitor` | CPU/Memory/Disk metrics | `hw.writeAll(45, 62, 80)` |
 
-Initialize WiFi and Firebase. Blocks until WiFi connects (15s timeout).
+## Firebase Path ↔ Dashboard Widget
 
-```cpp
-IoTX.begin({
-    .wifiSSID     = "SSID",
-    .wifiPassword = "PASS",
-    .firebaseHost = "xxx.firebasedatabase.app",
-    .firebaseAuth = "SECRET"
-});
-```
+| Path | Type | Widget |
+|---|---|---|
+| `/sensors/temperature` | float | Temperature |
+| `/sensors/humidity` | float | Humidity |
+| `/sensors/smoke` | float | Smoke |
+| `/sensors/progress` | float | Progress Bar |
+| `/sensors/data` | float | Chart |
+| `/controls/switch` | bool | Switch |
+| `/controls/led` | bool | LED |
+| `/controls/range-slider` | float | Range Slider |
+| `/display/lcd-text` | string | LCD Text |
+| `/hardware/cpu` | float | HW Manager |
+| `/hardware/memory` | float | HW Manager |
+| `/hardware/disk` | float | HW Manager |
 
-### `IoTXSensor`
+> Paths are configurable — use any path that matches your widget's `firebasePath` setting.
 
-Read/write numeric values. Maps to Temperature, Humidity, Smoke, Progress, and Chart widgets.
+## Thread Safety
 
-```cpp
-IoTXSensor temp("/sensors/temperature");
-temp.write(25.5);       // push to dashboard
-float val = temp.read(); // read back
-```
-
-### `IoTXSwitch`
-
-Boolean controls. Maps to Switch and LED widgets.
-
-```cpp
-IoTXSwitch led("/controls/led");
-led.attachPin(2);        // auto-sync to GPIO 2
-led.sync();              // read from Firebase → update pin
-led.write(true);         // push state to dashboard
-bool state = led.read(); // read state
-```
-
-Use `attachPin(pin, true)` for active-low relays.
-
-### `IoTXSlider`
-
-Numeric range controls. Maps to Range Slider widget.
-
-```cpp
-IoTXSlider slider("/controls/range-slider");
-slider.attachPin(25, 0, 100);  // PWM output, range 0–100
-slider.sync();                  // read from Firebase → update PWM
-slider.write(50.0);            // push value
-float val = slider.read();     // read value
-```
-
-### `IoTXDisplay`
-
-Text display. Maps to LCD Text widget.
-
-```cpp
-IoTXDisplay lcd("/display/lcd-text");
-lcd.write("Hello!");
-lcd.printf("Temp: %.1f C", 25.3);
-String text = lcd.read();
-```
-
-### `IoTXHardwareMonitor`
-
-System metrics. Maps to HW Manager widget.
-
-```cpp
-IoTXHardwareMonitor hw("/hardware");
-hw.writeCPU(45.2);
-hw.writeMemory(62.0);
-hw.writeDisk(80.5);
-hw.writeAll(45.2, 62.0, 80.5);
-```
-
-### Utility Methods
-
-```cpp
-IoTX.isConnected();     // WiFi + Firebase ready
-IoTX.isWiFiConnected();
-IoTX.isFirebaseReady();
-IoTX.reconnectWiFi();   // auto-reconnect
-IoTX.printStatus();     // print debug info
-IoTX.lock();            // mutex for advanced usage
-IoTX.unlock();
-```
-
-## Firebase Path ↔ Dashboard Widget Mapping
-
-| Firebase Path           | Type    | Dashboard Widget  |
-|-------------------------|---------|-------------------|
-| `/sensors/temperature`  | number  | Temperature       |
-| `/sensors/humidity`     | number  | Humidity          |
-| `/sensors/smoke`        | number  | Smoke             |
-| `/sensors/progress`     | number  | Progress Bar      |
-| `/sensors/data`         | number  | Chart             |
-| `/controls/switch`      | boolean | Switch            |
-| `/controls/led`         | boolean | LED               |
-| `/controls/range-slider`| number  | Range Slider      |
-| `/display/lcd-text`     | string  | LCD Text          |
-| `/hardware/cpu`         | number  | HW Manager (CPU)  |
-| `/hardware/memory`      | number  | HW Manager (RAM)  |
-| `/hardware/disk`        | number  | HW Manager (Disk) |
-
-> Paths are configurable — pass any path to match your dashboard widget's `firebasePath` setting.
-
-## Thread Safety (FreeRTOS)
-
-All read/write operations are mutex-protected. Safe to use across multiple FreeRTOS tasks:
+All operations are FreeRTOS mutex-protected. Safe across multiple tasks:
 
 ```cpp
 void taskSensors(void* p) {
@@ -169,13 +88,13 @@ void taskControls(void* p) {
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
-
-void setup() {
-    IoTX.begin({...});
-    xTaskCreatePinnedToCore(taskSensors,  "S", 4096, NULL, 1, NULL, 1);
-    xTaskCreatePinnedToCore(taskControls, "C", 4096, NULL, 1, NULL, 1);
-}
 ```
+
+## Full Documentation
+
+See [`docs/`](docs/) for detailed guides:
+
+- [Getting Started](docs/getting-started.md) · [API Reference](docs/api-reference.md) · [Firebase Paths](docs/firebase-paths.md) · [Examples](docs/examples.md) · [FreeRTOS](docs/freertos.md) · [Troubleshooting](docs/troubleshooting.md)
 
 ## License
 

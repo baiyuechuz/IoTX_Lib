@@ -206,7 +206,8 @@ void IoTXSlider::attachPin(int pin, float minVal, float maxVal) {
     _minVal = minVal;
     _maxVal = maxVal;
     _pinAttached = true;
-    ledcAttach(_pin, 5000, 8);
+    ledcSetup(_pin, 5000, 8);
+    ledcAttachPin(_pin, _pin);
 }
 
 void IoTXSlider::sync() {
