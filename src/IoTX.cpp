@@ -7,8 +7,12 @@ IoTXClass IoTX;
 // ============================================================
 
 IoTXClass::IoTXClass()
-    : _mutex(nullptr), _initialized(false),
-      _wifiSSID(nullptr), _wifiPassword(nullptr) {}
+    : _initialized(false),
+      _wifiSSID(nullptr), _wifiPassword(nullptr) {
+    for (uint8_t i = 0; i < FBDO_POOL_SIZE; i++) {
+        _poolMutexes[i] = nullptr;
+    }
+}
 
 bool IoTXClass::begin(const IoTXConfig& config) {
     _wifiSSID = config.wifiSSID;
@@ -35,11 +39,13 @@ bool IoTXClass::begin(const IoTXConfig& config) {
     Firebase.begin(&_config, &_auth);
     Firebase.reconnectWiFi(true);
 
-    // Mutex
-    _mutex = xSemaphoreCreateMutex();
-    if (_mutex == nullptr) {
-        Serial.println("[IoTX] Mutex creation failed");
-        return false;
+    // Mutexes for FirebaseData pool
+    for (uint8_t i = 0; i < FBDO_POOL_SIZE; i++) {
+        _poolMutexes[i] = xSemaphoreCreateMutex();
+        if (_poolMutexes[i] == nullptr) {
+            Serial.printf("[IoTX] Pool mutex %d creation failed\n", i);
+            return false;
+        }
     }
 
     _initialized = true;
@@ -60,16 +66,23 @@ bool IoTXClass::isFirebaseReady() const {
 }
 
 FirebaseData& IoTXClass::getFirebaseData() {
-    return _fbdo;
+    return _fbdoPool[0];
 }
 
-bool IoTXClass::lock(uint32_t timeoutMs) {
-    if (_mutex == nullptr) return false;
-    return xSemaphoreTake(_mutex, pdMS_TO_TICKS(timeoutMs)) == pdTRUE;
+int IoTXClass::acquireFirebaseData(uint32_t timeoutMs) {
+    for (uint8_t i = 0; i < FBDO_POOL_SIZE; i++) {
+        if (_poolMutexes[i] != nullptr &&
+            xSemaphoreTake(_poolMutexes[i], pdMS_TO_TICKS(timeoutMs / FBDO_POOL_SIZE)) == pdTRUE) {
+            return i;
+        }
+    }
+    return -1;
 }
 
-void IoTXClass::unlock() {
-    if (_mutex != nullptr) xSemaphoreGive(_mutex);
+void IoTXClass::releaseFirebaseData(int index) {
+    if (index >= 0 && index < FBDO_POOL_SIZE && _poolMutexes[index] != nullptr) {
+        xSemaphoreGive(_poolMutexes[index]);
+    }
 }
 
 void IoTXClass::reconnectWiFi() {
@@ -106,22 +119,24 @@ void IoTXClass::printStatus() {
 IoTXSensor::IoTXSensor(const char* firebasePath) : _path(firebasePath) {}
 
 bool IoTXSensor::write(float value) {
-    if (!IoTX.lock()) return false;
-    bool ok = Firebase.setFloat(IoTX._fbdo, _path, value);
-    IoTX.unlock();
-    if (!ok) Serial.printf("[IoTX] Sensor write failed %s: %s\n", _path, IoTX._fbdo.errorReason().c_str());
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return false;
+    bool ok = Firebase.setFloat(IoTX._fbdoPool[idx], _path, value);
+    if (!ok) Serial.printf("[IoTX] Sensor write failed %s: %s\n", _path, IoTX._fbdoPool[idx].errorReason().c_str());
+    IoTX.releaseFirebaseData(idx);
     return ok;
 }
 
 float IoTXSensor::read() {
     float val = 0;
-    if (!IoTX.lock()) return val;
-    if (Firebase.getFloat(IoTX._fbdo, _path)) {
-        val = IoTX._fbdo.floatData();
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return val;
+    if (Firebase.getFloat(IoTX._fbdoPool[idx], _path)) {
+        val = IoTX._fbdoPool[idx].floatData();
     } else {
-        Serial.printf("[IoTX] Sensor read failed %s: %s\n", _path, IoTX._fbdo.errorReason().c_str());
+        Serial.printf("[IoTX] Sensor read failed %s: %s\n", _path, IoTX._fbdoPool[idx].errorReason().c_str());
     }
-    IoTX.unlock();
+    IoTX.releaseFirebaseData(idx);
     return val;
 }
 
@@ -136,22 +151,24 @@ IoTXSwitch::IoTXSwitch(const char* firebasePath)
       _lastState(false), _pinAttached(false) {}
 
 bool IoTXSwitch::read() {
-    if (!IoTX.lock()) return _lastState;
-    if (Firebase.getBool(IoTX._fbdo, _path)) {
-        _lastState = IoTX._fbdo.boolData();
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return _lastState;
+    if (Firebase.getBool(IoTX._fbdoPool[idx], _path)) {
+        _lastState = IoTX._fbdoPool[idx].boolData();
     } else {
-        Serial.printf("[IoTX] Switch read failed %s: %s\n", _path, IoTX._fbdo.errorReason().c_str());
+        Serial.printf("[IoTX] Switch read failed %s: %s\n", _path, IoTX._fbdoPool[idx].errorReason().c_str());
     }
-    IoTX.unlock();
+    IoTX.releaseFirebaseData(idx);
     return _lastState;
 }
 
 bool IoTXSwitch::write(bool state) {
-    if (!IoTX.lock()) return false;
-    bool ok = Firebase.setBool(IoTX._fbdo, _path, state);
-    IoTX.unlock();
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return false;
+    bool ok = Firebase.setBool(IoTX._fbdoPool[idx], _path, state);
+    IoTX.releaseFirebaseData(idx);
     if (ok) _lastState = state;
-    else Serial.printf("[IoTX] Switch write failed %s: %s\n", _path, IoTX._fbdo.errorReason().c_str());
+    else Serial.printf("[IoTX] Switch write failed %s: %s\n", _path, IoTX._fbdoPool[idx].errorReason().c_str());
     return ok;
 }
 
@@ -183,21 +200,23 @@ IoTXSlider::IoTXSlider(const char* firebasePath)
 
 float IoTXSlider::read() {
     float val = 0;
-    if (!IoTX.lock()) return val;
-    if (Firebase.getFloat(IoTX._fbdo, _path)) {
-        val = IoTX._fbdo.floatData();
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return val;
+    if (Firebase.getFloat(IoTX._fbdoPool[idx], _path)) {
+        val = IoTX._fbdoPool[idx].floatData();
     } else {
-        Serial.printf("[IoTX] Slider read failed %s: %s\n", _path, IoTX._fbdo.errorReason().c_str());
+        Serial.printf("[IoTX] Slider read failed %s: %s\n", _path, IoTX._fbdoPool[idx].errorReason().c_str());
     }
-    IoTX.unlock();
+    IoTX.releaseFirebaseData(idx);
     return val;
 }
 
 bool IoTXSlider::write(float value) {
-    if (!IoTX.lock()) return false;
-    bool ok = Firebase.setFloat(IoTX._fbdo, _path, value);
-    IoTX.unlock();
-    if (!ok) Serial.printf("[IoTX] Slider write failed %s: %s\n", _path, IoTX._fbdo.errorReason().c_str());
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return false;
+    bool ok = Firebase.setFloat(IoTX._fbdoPool[idx], _path, value);
+    if (!ok) Serial.printf("[IoTX] Slider write failed %s: %s\n", _path, IoTX._fbdoPool[idx].errorReason().c_str());
+    IoTX.releaseFirebaseData(idx);
     return ok;
 }
 
@@ -206,8 +225,12 @@ void IoTXSlider::attachPin(int pin, float minVal, float maxVal) {
     _minVal = minVal;
     _maxVal = maxVal;
     _pinAttached = true;
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+    ledcAttach(_pin, 5000, 8);
+#else
     ledcSetup(_pin, 5000, 8);
     ledcAttachPin(_pin, _pin);
+#endif
 }
 
 void IoTXSlider::sync() {
@@ -228,10 +251,11 @@ const char* IoTXSlider::getPath() const { return _path; }
 IoTXDisplay::IoTXDisplay(const char* firebasePath) : _path(firebasePath) {}
 
 bool IoTXDisplay::write(const char* text) {
-    if (!IoTX.lock()) return false;
-    bool ok = Firebase.setString(IoTX._fbdo, _path, text);
-    IoTX.unlock();
-    if (!ok) Serial.printf("[IoTX] Display write failed %s: %s\n", _path, IoTX._fbdo.errorReason().c_str());
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return false;
+    bool ok = Firebase.setString(IoTX._fbdoPool[idx], _path, text);
+    if (!ok) Serial.printf("[IoTX] Display write failed %s: %s\n", _path, IoTX._fbdoPool[idx].errorReason().c_str());
+    IoTX.releaseFirebaseData(idx);
     return ok;
 }
 
@@ -250,13 +274,14 @@ bool IoTXDisplay::printf(const char* format, ...) {
 
 String IoTXDisplay::read() {
     String val;
-    if (!IoTX.lock()) return val;
-    if (Firebase.getString(IoTX._fbdo, _path)) {
-        val = IoTX._fbdo.stringData();
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return val;
+    if (Firebase.getString(IoTX._fbdoPool[idx], _path)) {
+        val = IoTX._fbdoPool[idx].stringData();
     } else {
-        Serial.printf("[IoTX] Display read failed %s: %s\n", _path, IoTX._fbdo.errorReason().c_str());
+        Serial.printf("[IoTX] Display read failed %s: %s\n", _path, IoTX._fbdoPool[idx].errorReason().c_str());
     }
-    IoTX.unlock();
+    IoTX.releaseFirebaseData(idx);
     return val;
 }
 
@@ -270,25 +295,28 @@ IoTXHardwareMonitor::IoTXHardwareMonitor(const char* basePath) : _basePath(baseP
 
 bool IoTXHardwareMonitor::writeCPU(float percent) {
     String path = String(_basePath) + "/cpu";
-    if (!IoTX.lock()) return false;
-    bool ok = Firebase.setFloat(IoTX._fbdo, path.c_str(), percent);
-    IoTX.unlock();
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return false;
+    bool ok = Firebase.setFloat(IoTX._fbdoPool[idx], path.c_str(), percent);
+    IoTX.releaseFirebaseData(idx);
     return ok;
 }
 
 bool IoTXHardwareMonitor::writeMemory(float percent) {
     String path = String(_basePath) + "/memory";
-    if (!IoTX.lock()) return false;
-    bool ok = Firebase.setFloat(IoTX._fbdo, path.c_str(), percent);
-    IoTX.unlock();
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return false;
+    bool ok = Firebase.setFloat(IoTX._fbdoPool[idx], path.c_str(), percent);
+    IoTX.releaseFirebaseData(idx);
     return ok;
 }
 
 bool IoTXHardwareMonitor::writeDisk(float percent) {
     String path = String(_basePath) + "/disk";
-    if (!IoTX.lock()) return false;
-    bool ok = Firebase.setFloat(IoTX._fbdo, path.c_str(), percent);
-    IoTX.unlock();
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return false;
+    bool ok = Firebase.setFloat(IoTX._fbdoPool[idx], path.c_str(), percent);
+    IoTX.releaseFirebaseData(idx);
     return ok;
 }
 

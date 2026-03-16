@@ -102,22 +102,25 @@ private:
 // ============================================================
 class IoTXClass {
 public:
+    static constexpr uint8_t FBDO_POOL_SIZE = 3;
+
     IoTXClass();
     bool begin(const IoTXConfig& config);
     bool isConnected() const;
     bool isWiFiConnected() const;
     bool isFirebaseReady() const;
     FirebaseData& getFirebaseData();
-    bool lock(uint32_t timeoutMs = 1000);
-    void unlock();
     void reconnectWiFi();
     void printStatus();
 
+    int acquireFirebaseData(uint32_t timeoutMs = 1000);
+    void releaseFirebaseData(int index);
+
 private:
-    FirebaseData _fbdo;
+    FirebaseData _fbdoPool[FBDO_POOL_SIZE];
+    SemaphoreHandle_t _poolMutexes[FBDO_POOL_SIZE];
     FirebaseAuth _auth;
     FirebaseConfig _config;
-    SemaphoreHandle_t _mutex;
     bool _initialized;
     const char* _wifiSSID;
     const char* _wifiPassword;
