@@ -1,0 +1,17 @@
+{
+  "name": "IoTX",
+  "version": "1.0.0",
+  "description": "Low-code IoT library for ESP32 - Easy Firebase connection with IoTX Dashboard compatibility",
+  "keywords": "iot,firebase,esp32,dashboard,realtime,low-code",
+  "authors": [
+    {
+      "name": "IoTX"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "dependencies": {
+    "mobizt/Firebase ESP32 Client": "*"
+  }
+}
