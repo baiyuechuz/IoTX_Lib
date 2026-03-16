@@ -1,0 +1,7 @@
+.pio
+.cache
+.vscode
+.platformio
+.platformio-core
+.platformio-penv
+result
