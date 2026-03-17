@@ -68,6 +68,22 @@ private:
 };
 
 // ============================================================
+// IoTXButton - Push button control (button widget)
+// ============================================================
+class IoTXButton {
+public:
+    IoTXButton(const char* firebasePath);
+    bool read();
+    bool write(bool state);
+    bool toggle();
+    bool getState() const;
+    const char* getPath() const;
+private:
+    const char* _path;
+    bool _lastState;
+};
+
+// ============================================================
 // IoTXDisplay - Text display (lcd-text widget)
 // ============================================================
 class IoTXDisplay {
@@ -128,6 +144,7 @@ private:
     friend class IoTXSensor;
     friend class IoTXSwitch;
     friend class IoTXSlider;
+    friend class IoTXButton;
     friend class IoTXDisplay;
     friend class IoTXHardwareMonitor;
 };

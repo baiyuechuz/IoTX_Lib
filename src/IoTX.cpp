@@ -245,6 +245,43 @@ void IoTXSlider::sync() {
 const char* IoTXSlider::getPath() const { return _path; }
 
 // ============================================================
+// IoTXButton
+// ============================================================
+
+IoTXButton::IoTXButton(const char* firebasePath)
+    : _path(firebasePath), _lastState(false) {}
+
+bool IoTXButton::read() {
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return _lastState;
+    if (Firebase.getBool(IoTX._fbdoPool[idx], _path)) {
+        _lastState = IoTX._fbdoPool[idx].boolData();
+    } else {
+        Serial.printf("[IoTX] Button read failed %s: %s\n", _path, IoTX._fbdoPool[idx].errorReason().c_str());
+    }
+    IoTX.releaseFirebaseData(idx);
+    return _lastState;
+}
+
+bool IoTXButton::write(bool state) {
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return false;
+    bool ok = Firebase.setBool(IoTX._fbdoPool[idx], _path, state);
+    IoTX.releaseFirebaseData(idx);
+    if (ok) _lastState = state;
+    else Serial.printf("[IoTX] Button write failed %s: %s\n", _path, IoTX._fbdoPool[idx].errorReason().c_str());
+    return ok;
+}
+
+bool IoTXButton::toggle() {
+    read();
+    return write(!_lastState);
+}
+
+bool IoTXButton::getState() const { return _lastState; }
+const char* IoTXButton::getPath() const { return _path; }
+
+// ============================================================
 // IoTXDisplay
 // ============================================================
 
