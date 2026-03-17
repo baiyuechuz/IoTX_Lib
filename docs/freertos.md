@@ -115,21 +115,19 @@ void loop() {
 | WiFi check | 10000–30000 ms | Low overhead |
 | Display update | 1000–5000 ms | Readable update rate |
 
-## Manual Mutex (Advanced)
+## FirebaseData Pool (Advanced)
 
-If you need to perform multiple Firebase operations atomically:
+IoTX uses a pool of 3 `FirebaseData` instances, each protected by its own FreeRTOS mutex. Built-in classes (`IoTXSensor`, `IoTXSwitch`, etc.) acquire and release automatically. For direct Firebase operations:
 
 ```cpp
-if (IoTX.lock(2000)) {  // 2 second timeout
-    FirebaseData& fbdo = IoTX.getFirebaseData();
-    Firebase.setFloat(fbdo, "/batch/val1", 1.0);
-    Firebase.setFloat(fbdo, "/batch/val2", 2.0);
-    Firebase.setFloat(fbdo, "/batch/val3", 3.0);
-    IoTX.unlock();
-}
+// For simple use (single-threaded or in setup):
+FirebaseData& fbdo = IoTX.getFirebaseData();
+Firebase.setFloat(fbdo, "/batch/val1", 1.0);
+Firebase.setFloat(fbdo, "/batch/val2", 2.0);
+Firebase.setFloat(fbdo, "/batch/val3", 3.0);
 ```
 
-> ⚠️ Always call `unlock()` after `lock()`. Never hold the mutex for long periods — it blocks all other IoTX operations.
+> ⚠️ `getFirebaseData()` returns the first pool slot without locking. For multi-task use, the built-in classes (`IoTXSensor`, `IoTXSwitch`, etc.) handle pool locking automatically — prefer using them over direct Firebase calls.
 
 ## Common Pitfalls
 

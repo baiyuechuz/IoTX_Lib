@@ -7,6 +7,7 @@
 - [IoTXSensor](#iotxsensor)
 - [IoTXSwitch](#iotxswitch)
 - [IoTXSlider](#iotxslider)
+- [IoTXButton](#iotxbutton)
 - [IoTXDisplay](#iotxdisplay)
 - [IoTXHardwareMonitor](#iotxhardwaremonitor)
 
@@ -14,7 +15,7 @@
 
 ## IoTX (Main Singleton)
 
-Global singleton that handles WiFi, Firebase, and the shared FreeRTOS mutex. Access it directly as `IoTX`.
+Global singleton that handles WiFi, Firebase, and a pool of FreeRTOS mutex-protected `FirebaseData` instances. Access it directly as `IoTX`.
 
 ### `IoTX.begin(config)` → `bool`
 
@@ -80,32 +81,37 @@ Print connection info to Serial:
 
 ### `IoTX.getFirebaseData()` → `FirebaseData&`
 
-Access the internal `FirebaseData` object for direct Firebase operations. **Must be used with `lock()`/`unlock()`.**
-
-```cpp
-if (IoTX.lock()) {
-    Firebase.setJSON(IoTX.getFirebaseData(), "/path", "{\"key\":\"value\"}");
-    IoTX.unlock();
-}
-```
+Returns the first `FirebaseData` object from the pool. For simple single-threaded use.
 
 ---
 
-### `IoTX.lock(timeoutMs)` → `bool`
+### `IoTX.acquireFirebaseData(timeoutMs)` → `int`
 
-Acquire the FreeRTOS mutex.
+Acquire a `FirebaseData` object from the pool (3 instances). Returns the pool index, or `-1` on timeout.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `timeoutMs` | `uint32_t` | `1000` | Timeout in milliseconds |
 
-**Returns:** `true` if acquired, `false` on timeout.
-
 ---
 
-### `IoTX.unlock()` → `void`
+### `IoTX.releaseFirebaseData(index)` → `void`
 
-Release the FreeRTOS mutex.
+Release a `FirebaseData` object back to the pool.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `index` | `int` | Pool index returned by `acquireFirebaseData()` |
+
+### Direct Firebase Access Example
+
+> **Note:** `_fbdoPool` is private — only IoTX built-in classes can access it directly. For custom Firebase operations, use `getFirebaseData()`:
+
+```cpp
+// Simple (single-threaded):
+FirebaseData& fbdo = IoTX.getFirebaseData();
+Firebase.setString(fbdo, "/status/device", "online");
+```
 
 ---
 
@@ -230,7 +236,7 @@ relay.sync();
 
 Read/write **float values** with optional PWM output via ESP32 LEDC.
 
-**Dashboard widgets:** Range Slider
+**Dashboard widgets:** Slider, Range Slider
 
 ### Constructor
 
@@ -273,6 +279,50 @@ brightness.attachPin(25, 0, 1023); // custom range
 
 // In a loop or task:
 brightness.sync();                 // Firebase value → PWM
+```
+
+---
+
+## IoTXButton
+
+Read/write **boolean values** with toggle support. Use for momentary button actions from the dashboard.
+
+**Dashboard widgets:** Button
+
+### Constructor
+
+```cpp
+IoTXButton btn("/controls/button");
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `firebasePath` | `const char*` | Firebase RTDB path |
+
+### Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `read()` | `bool` | Read boolean from Firebase. Returns last known state on failure. |
+| `write(bool state)` | `bool` | Write boolean to Firebase. Returns `true` on success. |
+| `toggle()` | `bool` | Read current state, then write the opposite. Returns `true` on success. |
+| `getState()` | `bool` | Get last known state without Firebase call. |
+| `getPath()` | `const char*` | Get the Firebase path. |
+
+### Example
+
+```cpp
+IoTXButton btn("/controls/button");
+
+// In a loop or task:
+bool pressed = btn.read();
+if (pressed) {
+    // handle button press
+    btn.write(false);  // reset after handling
+}
+
+// Or use toggle:
+btn.toggle();  // flips true ↔ false
 ```
 
 ---

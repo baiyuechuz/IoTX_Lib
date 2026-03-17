@@ -9,9 +9,9 @@
 - Move closer to the router
 - Check that the router isn't blocking new devices
 
-### `[IoTX] Mutex creation failed`
+### `[IoTX] Pool mutex <n> creation failed`
 
-- Not enough heap memory to create a FreeRTOS mutex
+- Not enough heap memory to create a FreeRTOS mutex for the FirebaseData pool
 - Reduce other memory allocations or use a board with more RAM
 
 ### Firebase `permission denied`
@@ -89,7 +89,7 @@
 | `[IoTX] WiFi OK: 192.168.x.x` | WiFi connected successfully |
 | `[IoTX] WiFi connection timeout` | Failed to connect within 15 seconds |
 | `[IoTX] Ready` | WiFi + Firebase + Mutex all initialized |
-| `[IoTX] Mutex creation failed` | Not enough memory for FreeRTOS mutex |
+| `[IoTX] Pool mutex <n> creation failed` | Not enough memory for FreeRTOS mutex |
 | `[IoTX] WiFi reconnecting...` | WiFi dropped, attempting reconnect |
 | `[IoTX] WiFi reconnected: 192.168.x.x` | Reconnection successful |
 | `[IoTX] WiFi reconnect failed` | Reconnection timed out (10 seconds) |
@@ -97,6 +97,8 @@
 | `[IoTX] Sensor read failed <path>: <reason>` | Firebase read error |
 | `[IoTX] Switch read failed <path>: <reason>` | Firebase read error |
 | `[IoTX] Switch write failed <path>: <reason>` | Firebase write error |
+| `[IoTX] Button read failed <path>: <reason>` | Firebase read error |
+| `[IoTX] Button write failed <path>: <reason>` | Firebase write error |
 | `[IoTX] Slider read failed <path>: <reason>` | Firebase read error |
 | `[IoTX] Slider write failed <path>: <reason>` | Firebase write error |
 | `[IoTX] Display write failed <path>: <reason>` | Firebase write error |
