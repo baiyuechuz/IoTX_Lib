@@ -9,11 +9,11 @@ These are the default `firebasePath` values used by IoTX Website dashboard widge
 | `/sensors/temperature` | `float` | `IoTXSensor` | Temperature |
 | `/sensors/humidity` | `float` | `IoTXSensor` | Humidity |
 | `/sensors/smoke` | `float` | `IoTXSensor` | Smoke |
-| `/sensors/progress` | `float` | `IoTXSensor` | Progress Bar |
-| `/sensors/data` | `float` | `IoTXSensor` | Chart |
 | `/controls/switch` | `bool` | `IoTXSwitch` | Switch |
-| `/controls/led` | `bool` | `IoTXSwitch` | LED |
+| `/controls/button` | `bool` | `IoTXButton` | Button |
+| `/controls/slider` | `float` | `IoTXSlider` | Slider |
 | `/controls/range-slider` | `float` | `IoTXSlider` | Range Slider |
+| `/sensors/data` | `float` | `IoTXSensor` | Chart (supports multiple paths) |
 | `/display/lcd-text` | `string` | `IoTXDisplay` | LCD Text |
 | `/hardware/cpu` | `float` | `IoTXHardwareMonitor` | HW Manager (CPU) |
 | `/hardware/memory` | `float` | `IoTXHardwareMonitor` | HW Manager (RAM) |
@@ -39,13 +39,12 @@ When you use the default paths, your Firebase Realtime Database will look like:
   "sensors": {
     "temperature": 25.5,
     "humidity": 60.2,
-    "smoke": 12.3,
-    "progress": 75.0,
-    "data": 42.0
+    "smoke": 12.3
   },
   "controls": {
     "switch": true,
-    "led": false,
+    "button": false,
+    "slider": 50.0,
     "range-slider": 50.0
   },
   "display": {
@@ -65,6 +64,7 @@ When you use the default paths, your Firebase Realtime Database will look like:
 |---|---|---|---|
 | `IoTXSensor` | number | `float` | `number` |
 | `IoTXSwitch` | boolean | `bool` | `boolean` (`true`/`false`) |
+| `IoTXButton` | boolean | `bool` | `boolean` (`true`/`false`) |
 | `IoTXSlider` | number | `float` | `number` |
 | `IoTXDisplay` | string | `String` / `const char*` | `string` |
 | `IoTXHardwareMonitor` | number | `float` | `number` (0–100) |

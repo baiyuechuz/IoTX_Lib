@@ -56,6 +56,7 @@ IoTXSensor smoke("/sensors/smoke");
 // Controls
 IoTXSwitch led("/controls/led");
 IoTXSlider slider("/controls/range-slider");
+IoTXButton btn("/controls/button");
 
 // Display
 IoTXDisplay lcd("/display/lcd-text");
@@ -86,6 +87,10 @@ void taskControls(void* pvParameters) {
     while (true) {
         led.sync();
         slider.sync();
+        if (btn.read()) {
+            Serial.println("Button pressed!");
+            btn.write(false);
+        }
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
@@ -176,6 +181,50 @@ void loop() {
         leds[i].sync();
     }
     delay(500);
+}
+```
+
+## Button Control
+
+Respond to button presses from the dashboard:
+
+```cpp
+#include <IoTX.h>
+
+IoTXButton btn("/controls/button");
+
+void setup() {
+    Serial.begin(115200);
+    IoTX.begin({
+        .wifiSSID     = "YOUR_WIFI",
+        .wifiPassword = "YOUR_PASS",
+        .firebaseHost = "xxx-default-rtdb.firebasedatabase.app",
+        .firebaseAuth = "YOUR_SECRET"
+    });
+}
+
+void loop() {
+    if (btn.read()) {
+        Serial.println("Button pressed!");
+        // Do something...
+        btn.write(false);  // reset button state
+    }
+    delay(500);
+}
+```
+
+### Toggle Mode
+
+Use `toggle()` to flip the state each time:
+
+```cpp
+IoTXButton toggle("/controls/button");
+
+void loop() {
+    // Read the current state
+    bool state = toggle.getState();
+    Serial.printf("Button state: %s\n", state ? "ON" : "OFF");
+    delay(1000);
 }
 ```
 
@@ -286,13 +335,10 @@ void setup() {
         .firebaseAuth = "YOUR_SECRET"
     });
 
-    // Direct Firebase write with mutex protection
-    if (IoTX.lock()) {
-        FirebaseData& fbdo = IoTX.getFirebaseData();
-        Firebase.setString(fbdo, "/status/device", "online");
-        Firebase.setInt(fbdo, "/status/boot_count", 42);
-        IoTX.unlock();
-    }
+    // Direct Firebase write using getFirebaseData()
+    FirebaseData& fbdo = IoTX.getFirebaseData();
+    Firebase.setString(fbdo, "/status/device", "online");
+    Firebase.setInt(fbdo, "/status/boot_count", 42);
 }
 
 void loop() {

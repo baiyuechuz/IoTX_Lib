@@ -47,6 +47,7 @@ void loop() {
 | `IoTXSensor` | Numeric values (temperature, humidity, smoke…) | `sensor.write(25.5)` |
 | `IoTXSwitch` | Boolean on/off with GPIO binding | `sw.attachPin(2); sw.sync()` |
 | `IoTXSlider` | Range values with PWM output | `slider.attachPin(25); slider.sync()` |
+| `IoTXButton` | Boolean toggle/press actions | `btn.read(); btn.toggle()` |
 | `IoTXDisplay` | Text with printf support | `lcd.printf("T:%.1fC", t)` |
 | `IoTXHardwareMonitor` | CPU/Memory/Disk metrics | `hw.writeAll(45, 62, 80)` |
 
@@ -57,15 +58,13 @@ void loop() {
 | `/sensors/temperature` | float | Temperature |
 | `/sensors/humidity` | float | Humidity |
 | `/sensors/smoke` | float | Smoke |
-| `/sensors/progress` | float | Progress Bar |
-| `/sensors/data` | float | Chart |
 | `/controls/switch` | bool | Switch |
-| `/controls/led` | bool | LED |
+| `/controls/button` | bool | Button |
+| `/controls/slider` | float | Slider |
 | `/controls/range-slider` | float | Range Slider |
 | `/display/lcd-text` | string | LCD Text |
-| `/hardware/cpu` | float | HW Manager |
-| `/hardware/memory` | float | HW Manager |
-| `/hardware/disk` | float | HW Manager |
+| `/hardware/*` | float | HW Manager |
+| `/sensors/data` | float | Chart (supports multiple paths) |
 
 > Paths are configurable — use any path that matches your widget's `firebasePath` setting.
 
