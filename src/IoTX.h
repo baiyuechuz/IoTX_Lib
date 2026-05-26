@@ -107,7 +107,9 @@ public:
     bool writeCPU(float percent);
     bool writeMemory(float percent);
     bool writeDisk(float percent);
+    bool writeTemperature(float celsius);
     bool writeAll(float cpu, float memory, float disk);
+    bool writeAll(float cpu, float memory, float disk, float temperature);
     const char* getPath() const;
 private:
     const char* _basePath;

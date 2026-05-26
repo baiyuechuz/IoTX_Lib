@@ -357,8 +357,21 @@ bool IoTXHardwareMonitor::writeDisk(float percent) {
     return ok;
 }
 
+bool IoTXHardwareMonitor::writeTemperature(float celsius) {
+    String path = String(_basePath) + "/temperature";
+    int idx = IoTX.acquireFirebaseData();
+    if (idx < 0) return false;
+    bool ok = Firebase.setFloat(IoTX._fbdoPool[idx], path.c_str(), celsius);
+    IoTX.releaseFirebaseData(idx);
+    return ok;
+}
+
 bool IoTXHardwareMonitor::writeAll(float cpu, float memory, float disk) {
     return writeCPU(cpu) && writeMemory(memory) && writeDisk(disk);
+}
+
+bool IoTXHardwareMonitor::writeAll(float cpu, float memory, float disk, float temperature) {
+    return writeAll(cpu, memory, disk) && writeTemperature(temperature);
 }
 
 const char* IoTXHardwareMonitor::getPath() const { return _basePath; }
